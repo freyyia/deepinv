@@ -22,6 +22,7 @@ from deepinv.physics.functional import (
 )
 from deepinv.physics.functional.product_convolution import compute_patch_info
 from typing import Tuple
+import warnings
 
 
 class Downsampling(LinearPhysics):
@@ -686,6 +687,20 @@ class SpaceVaryingBlur(LinearPhysics):
         self.overlap = overlap
         info = compute_patch_info(image_size, patch_size, overlap)
         self.num_patches = info["num_patches"]
+        if info["max_size"][0] < image_size[0] or info["max_size"][1] < image_size[1]:
+            better_overlap = (
+                int(
+                    (self.num_patches[0] * patch_size[0] - image_size[0])
+                    / (self.num_patches[0] - 1)
+                ),
+                int(
+                    (self.num_patches[1] * patch_size[1] - image_size[1])
+                    / (self.num_patches[1] - 1)
+                ),
+            )
+            warnings.warn(
+                f"The patch size and overlap do not cover the whole image. The input image will be cropped. Use can use overlap = {better_overlap}"
+            )
         self.max_image_size = info["max_size"]
 
     def check_patch_info(self):
