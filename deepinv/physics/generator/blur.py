@@ -360,6 +360,10 @@ class DiffractionBlurGenerator(PSFGenerator):
         if angles_deg is not None:
             psf = rotate_image_via_shear(psf, angles_deg)
 
+        if self.apodize:
+            psf = self.apodize_mask*psf
+
+
         return {
             "filter": psf.expand(-1, self.shape[0], -1, -1),
             "coeff": coeff,
