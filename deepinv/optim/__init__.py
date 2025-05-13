@@ -40,3 +40,5 @@ from .distance import (
     LogPoissonLikelihoodDistance,
     ZeroDistance,
 )
+
+from .ridge_regularizer import RidgeRegularizer
