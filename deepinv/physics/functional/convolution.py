@@ -62,7 +62,7 @@ def conv2d(
     # Expand the channel dim of the filter and move it into batch dimension
     filter = filter.reshape(B * C, -1, h, w)
     # Perform the convolution, using the groups parameter
-    output = F.conv2d(x, filter, padding="valid", groups=B * C)
+    output = F.conv2d(x, filter.to(x.device), padding="valid", groups=B * C)
     # Make it in the good shape
     output = output.view(B, C, output.size(-2), -1)
 
@@ -121,7 +121,7 @@ def conv_transpose2d(
     # Expand the channel dim of the filter and move it into batch dimension
     filter = filter.reshape(B * C, -1, h, w)
     # Perform the convolution, using the groups parameter
-    x = F.conv_transpose2d(y, filter, groups=B * C)
+    x = F.conv_transpose2d(y, filter.to(y.device), groups=B * C)
     # Make it in the good shape
     x = x.view(B, C, x.size(-2), -1)
 

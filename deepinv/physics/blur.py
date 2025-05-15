@@ -291,7 +291,7 @@ class Blur(LinearPhysics):
         self.update_parameters(filter=filter, **kwargs)
 
         if y.dim() == 4:
-            return conv_transpose2d(y, filter=self.filter, padding=self.padding)
+            return conv_transpose2d(y, filter=self.filter.to(y.device), padding=self.padding)
         elif y.dim() == 5:
             return conv_transpose3d_fft(y, filter=self.filter, padding=self.padding)
 
