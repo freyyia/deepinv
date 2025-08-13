@@ -213,8 +213,16 @@ class GSPnP(dinv.optim.prior.RED):
 pretrained_path = "..\\..\\..\\bregman_sampling\\BregmanPnP\\GS_denoising\\ckpts\\Prox-DRUNet.ckpt"
 # Specify the Denoising prior
 prior = GSPnP(denoiser=dinv.models.GSDRUNet(act_mode='s', 
-                                            pretrained=pretrained_path).to(device))
+                                           pretrained=pretrained_path).to(device))
+
+# GSDRUNet PSNR 21.78
 # prior = GSPnP(denoiser=dinv.models.GSDRUNet(pretrained="download").to(device))
+
+# working, psnr 21.96 but a slight checkerboard pattern
+# DncNN / LMMO
+# prior = dinv.optim.ScorePrior(
+#     denoiser=dinv.models.DnCNN(pretrained="download_lipschitz")
+# ).to(device)
 
 # lamb, sigma_denoiser, stepsize, max_iter = dinv.utils.get_GSPnP_params(
 #     problem="deblur", noise_level_img=20/255.0
@@ -224,10 +232,10 @@ prior = GSPnP(denoiser=dinv.models.GSDRUNet(act_mode='s',
 # lamb = 0.5
 # stepsize = 0.0001 #1 / lamb
 
-max_iter = 220
-sigma_denoiser = 1.8 * 25/255.0
+max_iter = 350
+sigma_denoiser = 1 * 25/255.0 #1.8
 lamb = 0.1
-stepsize = 0.1*  1/lamb
+stepsize = 1
 
 params_algo = {
     "stepsize": stepsize,
