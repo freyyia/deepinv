@@ -5,16 +5,15 @@ from .base import Denoiser
 # Compat for optional dependency on BM3D
 try:
     import bm3d
-except:
-    bm3d = ImportError("The bm3d package is not installed.")
+except:  # pragma: no cover
+    bm3d = ImportError("The bm3d package is not installed.")  # pragma: no cover
 
 
 class BM3D(Denoiser):
     r"""
     BM3D denoiser.
 
-    The BM3D denoiser was introduced in "Image denoising by sparse 3D transform-domain collaborative filtering", by
-    Dabov et al., IEEE Transactions on Image Processing (2007).
+    The BM3D denoiser was introduced by :footcite:t:`dabov2007image`.
 
 
     .. note::
@@ -46,8 +45,7 @@ class BM3D(Denoiser):
 
         out = torch.zeros_like(x)
 
-        if not torch.is_tensor(sigma):
-            sigma = torch.tensor(sigma).repeat(x.shape[0])
+        sigma = self._handle_sigma(sigma, batch_size=x.size(0))
 
         for i in range(x.shape[0]):
             out[i, :, :, :] = array2tensor(
