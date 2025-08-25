@@ -1,5 +1,3 @@
-
-
 import deepinv as dinv
 from pathlib import Path
 import torch
@@ -27,7 +25,7 @@ plt.rcParams.update({
 
 BASE_DIR = Path(".")
 DATA_DIR = BASE_DIR / "measurements"
-RESULTS_DIR = BASE_DIR / "results" / "demo_map_gridsearch_inpainting"
+RESULTS_DIR = BASE_DIR / "results" / "demo_map_gridsearch_ct"
 DEG_DIR = BASE_DIR / "degradations"
 
 plot_convergence_metrics = True
@@ -35,7 +33,10 @@ plot_convergence_metrics = True
 
 # %%
 # Load base image datasets and degradation operators.
-
+# ----------------------------------------------------------------------------------------
+# In this example, we use the Set3C dataset and a motion blur kernel from
+# `Levin et al. (2009) <https://ieeexplore.ieee.org/abstract/document/5206815/>`_.
+#
 
 # Set the global random seed from pytorch to ensure reproducibility of the example.
 torch.manual_seed(0)
@@ -43,35 +44,44 @@ torch.manual_seed(0)
 device = dinv.utils.get_freer_gpu() if torch.cuda.is_available() else "cpu"
 
 # Set up the variable to fetch dataset and operators.
-dataset_name = "set3c"
-img_size = 64 if torch.cuda.is_available() else 64
-val_transform = transforms.Compose(
-    [transforms.CenterCrop(img_size), transforms.ToTensor()]
-)
+# dataset_name = "set3c"
+# img_size = 64 if torch.cuda.is_available() else 64
+# val_transform = transforms.Compose(
+#     [transforms.CenterCrop(img_size), transforms.ToTensor()]
+# )
 
-dataset = load_dataset(dataset_name, transform=val_transform)
+# dataset = load_dataset(dataset_name, transform=val_transform)
+img_size = 256
+problem = 'Tomography'
+save_dir = f'../datasets/{problem}'
+data_test = dinv.datasets.HDF5Dataset(path=f'{save_dir}/dinv_dataset0.h5', train=False)
+
+#get item via (x,y) = test_dataloader.__getitem__(idx)
 
 
 # %%
-# Generate a dataset of blurred images and load it.
-# --------------------------------------------------------------------------------
-# We use the BlurFFT class from the physics module to generate a dataset of blurred images.
-
+# Generate a physics operator for CT
 
 poisson_level = 20  # Poisson noise level for the degradation
-n_channels = 3  # 3 for color images, 1 for gray-scale images
+n_channels = 1  # 3 for color images, 1 for gray-scale images
 
-physics = dinv.physics.Inpainting(
-    tensor_size=(n_channels, img_size, img_size),
-    mask=0.7,
-    device=device,
-    noise_model=dinv.physics.Denoising(dinv.physics.PoissonNoise(torch.tensor(1.0/poisson_level))),
+mu = 1 / 50.0 * (362.0 / img_size)
+num_angles = 360
+# angles = torch.linspace(0, 360, steps=num_angles)
+noise_model = dinv.physics.PoissonNoise(torch.tensor(1.0/poisson_level))
+physics = dinv.physics.Tomography(angles=num_angles,
+    img_width=img_size,
+    #fbp_interpolate_boundary=True, 
+    device=device, 
+    noise_model=noise_model
 )
+
 
 # Select the first image from the dataset
 # x = dataset[2][0].mean(dim=0).unsqueeze(0).unsqueeze(0).to(device)
-x = dataset[2][0].unsqueeze(0).to(device)
-
+(x_t,y_t) = data_test.__getitem__(0)
+x = x_t.unsqueeze(0).to(device)
+y = y_t.unsqueeze(0).to(device)
 
 # Apply the degradation to the image
 y = physics(x)
@@ -79,7 +89,7 @@ y = physics(x)
 
 # %%
 # Select the data fidelity term
-data_fidelity = PoissonLikelihood(gain=1.0/poisson_level, bkg=1e-4)
+data_fidelity = PoissonLikelihood(gain=1.0/poisson_level, bkg=1e-8)
 
 #%% Setup the second reconstruction method
 #
@@ -106,53 +116,50 @@ class GSPnP(dinv.optim.prior.RED):
         return self.denoiser.potential(x, *args, **kwargs)
 
 
-# choose prior
-proxdrunet = True
-lmmo = False
 
-if proxdrunet:
-    filepath = "..\\..\\..\\bregman_sampling\\BregmanPnP\\GS_denoising\\ckpts\\Prox-DRUNet.ckpt"
-        
-    # filepath = hf_hub_download(
-    #     repo_id="deepinv/gradientstep",     
-    #     filename="Prox-DRUNet.ckpt"
-    # )
-    # # hf_path = "https://huggingface.co/deepinv/gradientstep/resolve/main/Prox-DRUNet.ckpt"
-    # Specify the Denoising prior
-    prior = GSPnP(denoiser=dinv.models.GSDRUNet(act_mode='s', 
-                                            pretrained=filepath).to(device))
+# pretrained_path = "..\\..\\..\\bregman_sampling\\BregmanPnP\\GS_denoising\\ckpts\\Prox-DRUNet.ckpt"
+    
+filepath = hf_hub_download(
+    repo_id="deepinv/gradientstep",     
+    filename="Prox-DRUNet.ckpt"
+)
+# hf_path = "https://huggingface.co/deepinv/gradientstep/resolve/main/Prox-DRUNet.ckpt"
+# Specify the Denoising prior
+# prior = GSPnP(denoiser=dinv.models.GSDRUNet(act_mode='s', 
+#                                            pretrained=filepath).to(device))
 
-if lmmo:
-    filepath = "..\..\..\LMMO_lightning\logs\DNCNN\lightning_logs\out.ckpt"
+pretrained = "../datasets/Tomographysup/25-08-25-15_19_57/ckp_best.pth.tar" 
 
-    ckpt = torch.load(filepath, map_location="cpu")
-    model = dinv.models.DnCNN()
-    model.load_state_dict(ckpt["state_dict"], strict=True)
-    prior = dinv.optim.ScorePrior(denoiser=model).to(device)
+#Artifact removal doesn't work here
+# denoiser = dinv.models.ArtifactRemoval(
+#     backbone_net=dinv.models.UNet(in_channels=1, out_channels=1, 
+#             scales=4, bias=False, batch_norm=False))
+# denoiser.load_state_dict(torch.load(pretrained, map_location=device)['state_dict'])
+# denoiser.eval()
+
+# prior = dinv.optim.ScorePrior(
+#     denoiser=dinv.models.DnCNN(in_channels=1, out_channels=1, pretrained="download_lipschitz")
+# ).to(device)
+
+prior = dinv.optim.prior.TVPrior(n_it_max=20).to(device)
+
+
+
 #%%
-
-# lamb, sigma_denoiser, stepsize, max_iter = get_GSPnP_params(
-#     problem="deblur", noise_level_img=20/255.0
-# )
-
-
-#%%
-
 # we want to output the intermediate PGD update to finish with a denoising step.
 def custom_output(X):
     return X["est"][1]
 
-max_iter = 100
-# sigma_denoiser = 1.8 * 25/255.0
+max_iter = 5
 multiple_list = [1]
-lamb_list = [1]#[0.25][0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15]
-stepsize_list = [0.001] 
+lamb_list = [1,5]
+stepsize_list = [0.0001] 
 
 for i in range(len(lamb_list)):
     for j in range(len(multiple_list)):
         lamb = lamb_list[i] 
         stepsize = 1
-        sigma_denoiser = multiple_list[j] * (20/255.0)  
+        sigma_denoiser = 2/255.0 #multiple_list[j] * (25/255.0)  
         print(f"=== Running for lamb = {lamb} and sigma_denoiser factor = { multiple_list[j]} ===")
 
         params_algo = {
@@ -176,6 +183,9 @@ for i in range(len(lamb_list)):
             backtracking=True,
             get_output=custom_output,
             verbose=False,
+            custom_init=lambda observation, physics: {
+            "est": (physics.A_dagger(observation), physics.A_dagger(observation))
+            },  # initialize the optimization with FBP reconstruction
         )
 
         #run the model on the problem.
@@ -189,24 +199,17 @@ for i in range(len(lamb_list)):
 
 
         # plot images. Images are saved in RESULTS_DIR.
-        # imgs = [y, x, x_lin, x_model]
         imgs = [y, x,  x_model_proxdrunet]
         plot(
             imgs,
             titles=["Input", "GT", "Proxdrunet"],
             save_dir=RESULTS_DIR,
-            rescale_mode="clip"
+            #rescale_mode="clip"
         )
 
         # plot convergence curves
         if plot_convergence_metrics:
             plot_curves(metrics_proxdrunet)
-
-
-
-
-
-# %
 
 
 

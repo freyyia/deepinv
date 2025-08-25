@@ -45,7 +45,7 @@ device = dinv.utils.get_freer_gpu() if torch.cuda.is_available() else "cpu"
 
 # Set up the variable to fetch dataset and operators.
 dataset_name = "set3c"
-img_size = 64 if torch.cuda.is_available() else 64
+img_size = 256 if torch.cuda.is_available() else 64
 val_transform = transforms.Compose(
     [transforms.CenterCrop(img_size), transforms.ToTensor()]
 )
