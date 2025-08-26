@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import List, Union
-import warnings
+from typing import Union
 from hashlib import sha256
 
 
@@ -74,7 +73,16 @@ class PhysicsGenerator(nn.Module):
                 device
             ), f"The random generator is not on the same device as the Physics Generator. Got random generator on {rng.device} and the Physics Generator named {self.__class__.__name__} on {self.device}."
             self.rng = rng
-        self.initial_random_state = self.rng.get_state()
+
+        # NOTE: There is no use in moving RNG states from one device to another
+        # as Generator.set_state only supports inputs living on the CPU. Yet,
+        # by registering the initial random state as a buffer, it might be
+        # moved to another device. This might hinder performance as the tensor
+        # will need to be moved back to the CPU if it needs to be used later.
+        # We could fix that by letting it be a regular class attribute instead
+        # of a buffer but it would prevent it from being included in the
+        # state dicts which is undesirable.
+        self.register_buffer("initial_random_state", self.rng.get_state().to(device))
 
         # Set attributes
         for k, v in kwargs.items():
@@ -115,7 +123,8 @@ class PhysicsGenerator(nn.Module):
         r"""
         Reset the random number generator to its initial state.
         """
-        self.rng.set_state(self.initial_random_state)
+        # NOTE: Generator.set_state expects a tensor living on the CPU.
+        self.rng.set_state(self.initial_random_state.cpu())
 
     def __add__(self, other):
         r"""
@@ -196,8 +205,8 @@ class GeneratorMixture(PhysicsGenerator):
 
     def __init__(
         self,
-        generators: List[PhysicsGenerator],
-        probs: List[float],
+        generators: list[PhysicsGenerator],
+        probs: list[float],
         rng: torch.Generator = None,
     ) -> None:
         super().__init__(rng=rng)

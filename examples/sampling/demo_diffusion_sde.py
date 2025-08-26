@@ -174,7 +174,7 @@ except FileNotFoundError:
 del trajectory  # clean memory
 mask = torch.ones_like(x)
 mask[..., 24:40, 24:40] = 0.0
-physics = dinv.physics.Inpainting(tensor_size=x.shape[1:], mask=mask, device=device)
+physics = dinv.physics.Inpainting(img_size=x.shape[1:], mask=mask, device=device)
 y = physics(x)
 
 weight = 1.0  # guidance strength
@@ -375,8 +375,8 @@ denoiser = dinv.models.DRUNet(pretrained="download").to(device)
 sde = VarianceExplodingDiffusion(
     sigma_max=sigma_max, sigma_min=sigma_min, alpha=0.75, device=device, dtype=dtype
 )
-x = dinv.utils.load_url_image(
-    dinv.utils.demo.get_image_url("butterfly.png"),
+x = dinv.utils.load_example(
+    "butterfly.png",
     img_size=256,
     resize_mode="resize",
 ).to(device)
@@ -385,7 +385,7 @@ mask = torch.ones_like(x)
 mask[..., 70:150, 120:180] = 0
 physics = dinv.physics.Inpainting(
     mask=mask,
-    tensor_size=x.shape[1:],
+    img_size=x.shape[1:],
     device=device,
 )
 
