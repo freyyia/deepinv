@@ -81,8 +81,9 @@ physics = dinv.physics.BlurFFT(
 
 # Select the first image from the dataset
 # x = dataset[2][0].mean(dim=0).unsqueeze(0).unsqueeze(0).to(device)
-x = dataset[2][0].unsqueeze(0).to(device)
+x = dataset[2].unsqueeze(0).to(device)
 
+#%%
 
 # Apply the degradation to the image
 y1 = physics(x[0,0].unsqueeze(0).unsqueeze(0))
@@ -303,7 +304,7 @@ plot([x, torch.cat((y1, y2,y3),dim=1),
 # compute PSNR
 # print(f"Linear reconstruction PSNR: {dinv.metric.PSNR()(x, x_lin).item():.2f} dB")
 
-
+#%%
 print(f"WCRNN reconstruction PSNR: {dinv.metric.PSNR()(x, recon).item():.2f} dB")
 print(f"TV reconstruction PSNR: {dinv.metric.PSNR()(x, x_model_tv).item():.2f} dB")
 print(f"Prox-DRUNet reconstruction PSNR: {dinv.metric.PSNR()(x, x_model_proxdrunet).item():.2f} dB")
