@@ -77,7 +77,9 @@ physics = dinv.physics.BlurFFT(
 
 # Select the first image from the dataset
 # x = dataset[2][0].mean(dim=0).unsqueeze(0).unsqueeze(0).to(device)
-x = dataset[2][0].unsqueeze(0).to(device)
+# x = dataset[2][0].unsqueeze(0).to(device) #grayscale
+x = dataset[2].unsqueeze(0).to(device)
+
 
 
 # Apply the degradation to the image
