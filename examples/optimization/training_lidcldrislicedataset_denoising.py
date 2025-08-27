@@ -34,7 +34,6 @@ problem = "Tomography"
 problem_desc = 'Denoising_on_CT'
 sigma = .1
 save_dir = f'./datasets/{problem}'
-path = save_dir
 imwidth = 256
 device = dinv.utils.get_freer_gpu() if torch.cuda.is_available() else "cpu"
 train = True  
@@ -134,7 +133,7 @@ def count_parameters(model):
 
 wandb_vis = True #True
 
-method = 'sup' #sure'
+method = 'sup_ct_denoising' #sure'
 
 
 
@@ -193,7 +192,7 @@ if wandb_vis:
 metrics = [dinv.loss.PSNR()]
 trainer = dinv.Trainer(losses=losses, model=model, ckp_interval=1, online_measurements=True,
                        physics=physics, verbose_individual_losses=True, metrics=metrics,
-                       save_path=path+f'{method}/', wandb_vis=wandb_vis, plot_images=True, plot_interval=1,
+                       save_path=save_dir+f'{method}/', wandb_vis=wandb_vis, plot_images=True, plot_interval=1,
                        scheduler=scheduler, optimizer=optimizer, train_dataloader=train_dataloader,
                        device=device, eval_dataloader=test_dataloader, eval_interval=int(epochs/20), epochs=epochs)
 
