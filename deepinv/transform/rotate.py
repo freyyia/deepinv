@@ -5,7 +5,6 @@ from torchvision.transforms import InterpolationMode
 from deepinv.transform.base import Transform, TransformParam
 from warnings import warn
 
-
 class Rotate(Transform):
     r"""
     2D Rotations.
@@ -34,7 +33,7 @@ class Rotate(Transform):
         limits: float = 360.0,
         multiples: float = 1.0,
         positive: bool = False,
-        interpolation_mode: InterpolationMode | None = None,
+        interpolation_mode: InterpolationMode = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
