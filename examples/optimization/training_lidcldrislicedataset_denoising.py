@@ -46,21 +46,52 @@ if not os.path.exists(f'{save_dir}/dinv_dataset0.h5'):  # download dataset
     # hf_hub_download(repo_id="jtachella/equivariant_bootstrap", filename=f'{problem}/physics0.pt',
     #                 cache_dir=save_dir2, local_dir=save_dir2)
 
+
+#create custom physics class to cover a range of noise levels
+class RandomGaussianNoiseModel(dinv.physics.GaussianNoise):
+    def __init__(self, sigma_min=0, sigma_max=51):
+        super().__init__()
+        self.sigma_min = sigma_min
+        self.sigma_max = sigma_max
+
+    
+    def forward(self, x, sigma=None, seed=None, **kwargs):
+        r"""
+        Adds the noise to measurements x
+
+        :param torch.Tensor x: measurements
+        :param float, torch.Tensor sigma: standard deviation of the noise.
+            If not `None`, it will overwrite the current noise level.
+        :param int seed: the seed for the random number generator, if `rng` is provided.
+
+        :returns: noisy measurements
+        """
+        sigma = torch.randint(self.sigma_min, self.sigma_max, (1,))/255.0
+        self.update_parameters(sigma=sigma, **kwargs)
+        self.to(x.device)
+        return (
+            x
+            + self.randn_like(x, seed=seed)
+            * self.sigma[(...,) + (None,) * (x.dim() - 1)]
+        )
+    
+
+        
 # defined physics
-physics = dinv.physics.Denoising(noise_model=dinv.physics.GaussianNoise(sigma=sigma))
+physics = dinv.physics.Denoising(noise_model=RandomGaussianNoiseModel()).to(device)
+#physics = dinv.physics.Denoising(noise_model=dinv.physics.GaussianNoise()).to(device)
 
 # load dataset
-
 data_train = [dinv.datasets.HDF5Dataset(path=f'{save_dir}/dinv_dataset0.h5', train=True)]
 data_test = [dinv.datasets.HDF5Dataset(path=f'{save_dir}/dinv_dataset0.h5', train=False)]
 
 if supervised:
 
         
-    backbone = dinv.models.UNet(in_channels=1, out_channels=1, scales=4, bias=False, batch_norm=False).to(device)
-    # backbone = dinv.models.GSDRUNet(act_mode='s', in_channels=1, out_channels=1, 
-                                    # pretrained="download").to(device)
-    model = dinv.models.Denoiser(backbone).to(device)
+    model = dinv.models.UNet(in_channels=1, out_channels=1, scales=4, bias=False, batch_norm=False).to(device)
+    #model = dinv.models.GSDRUNet(act_mode='s', in_channels=1, out_channels=1, 
+    #                                 pretrained="download").to(device)
+    # model = dinv.models.Denoiser(denoiser=backbone).to(device)
 
 
 
@@ -76,8 +107,10 @@ if supervised:
 
 else:
     # choose a reconstruction architecture
-    backbone = dinv.models.UNet(in_channels=1, out_channels=1, scales=5, # 4
-                                bias=False, batch_norm=False).to(device)
+    # backbone = dinv.models.UNet(in_channels=1, out_channels=1, scales=5, # 4
+    #                             bias=False, batch_norm=False).to(device)
+    backbone = dinv.models.GSDRUNet(act_mode='s', in_channels=1, out_channels=1, 
+                                     pretrained="download").to(device)
     model = dinv.models.Denoiser(backbone, pinv=True).to(device)
 
 
@@ -158,9 +191,9 @@ if wandb_vis:
 
 
 metrics = [dinv.loss.PSNR()]
-trainer = dinv.Trainer(losses=losses, model=model, ckp_interval=1, online_measurements=False,
+trainer = dinv.Trainer(losses=losses, model=model, ckp_interval=1, online_measurements=True,
                        physics=physics, verbose_individual_losses=True, metrics=metrics,
-                       save_path=path+f'{method}/', wandb_vis=wandb_vis, plot_images=True, freq_plot=int(epochs/20),
+                       save_path=path+f'{method}/', wandb_vis=wandb_vis, plot_images=True, plot_interval=1,
                        scheduler=scheduler, optimizer=optimizer, train_dataloader=train_dataloader,
                        device=device, eval_dataloader=test_dataloader, eval_interval=int(epochs/20), epochs=epochs)
 
