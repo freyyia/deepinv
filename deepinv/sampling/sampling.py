@@ -256,7 +256,7 @@ class BaseSampling(Reconstructor):
                         self.history.append(X)
 
                     for _, (g, stat) in enumerate(
-                        zip(g_statistics, statistics, strict=True)
+                        zip(g_statistics, statistics)
                     ):
                         stat.update(g(X))
 

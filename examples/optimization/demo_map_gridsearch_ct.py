@@ -63,12 +63,12 @@ def hu_normalize_resize(img: torch.Tensor, hu_min=-1024, hu_max=400, eps=1e-4, s
 #commenting use of lung data set
 
 # Read sample
-# sample = 63
-# sample_ct   = read_nii("../../../deepinv/examples/optimization/datasets/lits-test-subset/test-volume-" + str(sample) + ".nii")
+sample = 63
+sample_ct   = read_nii("../../../deepinv/examples/optimization/datasets/lits-test-subset/test-volume-" + str(sample) + ".nii")
 
-# temp = sample_ct[...,70]
-# temp_t = torch.from_numpy(np.ascontiguousarray(temp)).float()
-# temp_t = (hu_normalize_resize(temp_t)).unsqueeze(0).clamp(1e-4, None)
+temp = sample_ct[...,70]
+temp_t = torch.from_numpy(np.ascontiguousarray(temp)).float()
+x = (hu_normalize_resize(temp_t)).unsqueeze(0).clamp(1e-4, None).to(device)
 
 # plot(temp_t)
 
@@ -94,10 +94,10 @@ img_size = 256
 problem = "Tomography"
 save_dir = f'../datasets/{problem}'
 
-data_test = [dinv.datasets.HDF5Dataset(path=f'{save_dir}/dinv_dataset0.h5', train=False)]
+# data_test = [dinv.datasets.HDF5Dataset(path=f'{save_dir}/dinv_dataset0.h5', train=False)]
 
-(x, _) = next(iter(data_test[0]))
-x = x.unsqueeze(0).to(device)
+# (x, _) = next(iter(data_test[0]))
+#x = x.unsqueeze(0).to(device)
 plot([x])
 
 #%%
@@ -223,7 +223,7 @@ prior.denoiser.load_state_dict(ckpt["state_dict"])
 #%%
 
 max_iter = 20
-denoiser_factors = [1, 0.5, 0.1]
+denoiser_factors = [1, 0.5]
 lamb_list = [5, 1e1, 30]
 stepsize_list = [1e-4, 1e-4, 1e-4] 
 #Lipschitz constant 
@@ -245,7 +245,7 @@ for i in range(len(lamb_list)):
 
         # instantiate the algorithm class to solve the IP problem.
         model = optim_builder(
-            iteration="PGD",
+            iteration="GD",
             prior=prior,
             g_first=True,
             data_fidelity=data_fidelity,

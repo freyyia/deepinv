@@ -74,7 +74,7 @@ sample_ct   = read_nii("../../../deepinv/examples/optimization/datasets/lits-tes
 
 temp = sample_ct[...,70]
 temp_t = torch.from_numpy(np.ascontiguousarray(temp)).float()
-x = (hu_normalize_resize(temp_t)).unsqueeze(0).clamp(1e-4, None).to(device)
+# x = (hu_normalize_resize(temp_t)).unsqueeze(0).clamp(1e-4, None).to(device)
 
 # plot(temp_t)
 
@@ -96,10 +96,10 @@ img_size = 256
 problem = "Tomography"
 save_dir = f'../datasets/{problem}'
 
-# data_test = [dinv.datasets.HDF5Dataset(path=f'{save_dir}/dinv_dataset0.h5', train=False)]
+data_test = [dinv.datasets.HDF5Dataset(path=f'{save_dir}/dinv_dataset0.h5', train=False)]
 
-# (x, _) = next(iter(data_test[0]))
-# x = x.unsqueeze(0).to(device)
+(x, _) = next(iter(data_test[0]))
+x = x.unsqueeze(0).to(device)
 plot([x])
 
 #%%
@@ -274,7 +274,7 @@ plot(
     rescale_mode="min_max"
 )
 
-
+plot(torch.sqrt(var), save_dir=RESULTS_DIR / "std")
 
 
 
