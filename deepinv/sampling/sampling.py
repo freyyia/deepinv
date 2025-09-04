@@ -365,7 +365,7 @@ def sampling_builder(
     params_algo: dict = {},
     max_iter: int = 100,
     thresh_conv: float = 1e-3,
-    burnin_ratio: float = 0.2,
+    burnin_ratio: float = 0.02,
     thinning: int = 10,
     history_size: Union[int, bool] = 5,
     verbose: bool = False,
