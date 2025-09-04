@@ -149,6 +149,16 @@ class BurgEntropy(Bregman):
         :return: (torch.tensor) gradient :math:`\nabla_x h^*`, computed in :math:`x`.
         """
         return -1 / x
+    
+
+    def hessian(self, x, *args, **kwargs):
+        r"""
+        Calculates the gradient of the conjugate of Burg's entropy :math:`\nabla h^*(x) = 1 / x^2`.
+
+        :param torch.Tensor x: Variable :math:`x` at which the gradient is computed.
+        :return: (torch.tensor) gradient :math:`\nabla_x h^*`, computed in :math:`x`.
+        """
+        return 1 / x**2
 
 
 class NegEntropy(Bregman):
