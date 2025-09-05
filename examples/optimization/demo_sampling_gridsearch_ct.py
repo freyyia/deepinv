@@ -12,6 +12,7 @@ import nibabel as nib
 import numpy as np
 import matplotlib.pyplot as plt
 import torchvision.transforms as T
+import wandb
 
 # Set the global random seed from pytorch to ensure reproducibility of the example.
 torch.manual_seed(0)
@@ -135,11 +136,13 @@ y = physics(x).clamp(1e-4,None)
 
 plot([x,y, physics.A_dagger(y)])
 
-
+#%%
+image_mean = poisson_level*torch.mean(x)
+beta = image_mean * 0.02 
 
 # %%
 # Select the data fidelity term
-data_fidelity = PoissonLikelihood(gain=1.0/poisson_level, bkg=1e-8)
+data_fidelity = PoissonLikelihood(gain=1.0/poisson_level, bkg=beta.item())
 
 #%% Setup the reconstruction method
 #
@@ -189,14 +192,27 @@ def custom_output(X):
 # denoiser.load_state_dict(torch.load(pretrained, map_location=device)['state_dict'])
 # denoiser.eval()
 
+# model_gsdrunet = dinv.models.GSDRUNet(
+#         in_channels=1,
+#         out_channels=1,
+#         device=device,
+#         pretrained=Path(
+#             "ct-drunet-weights/ckp_532.pth.tar"
+#         ),
+#     )
+
+#soon to be proxdrunet
 model_gsdrunet = dinv.models.GSDRUNet(
-        in_channels=1,
-        out_channels=1,
-        device=device,
-        pretrained=Path(
-            "ct-drunet-weights/ckp_532.pth.tar"
-        ),
-    )
+    in_channels=1,
+    out_channels=1,
+    act_mode='s',
+    device=device,
+    pretrained=Path(
+        #"datasets/ct_drunet/epoch=69-step=43680.ckpt"
+        # "datasets/ct_drunet/epoch=77-step=48672.ckpt"
+        "datasets/ct_drunet/epoch=113-step=71136.ckpt"
+    ),
+)
 
 prior = dinv.optim.ScorePrior(
     denoiser=dinv.models.UNet(in_channels=1, 
@@ -222,6 +238,21 @@ prior.denoiser.load_state_dict(ckpt["state_dict"])
 # #%%
 # prior =dinv.optim.PnP(denoiser=ram_model).to(device)
 
+#%% determine step sizes
+
+# the operator 
+
+
+L = 1.0
+AAT_norm = 88984.89
+L_y =  poisson_level**2*(torch.max(y)/beta**2)*AAT_norm
+eps = (25/255)**2
+
+delta_max = 1.0/(L/eps+L_y)
+print("Stepsize: ", delta_max)
+delta_frac = 1
+delta = delta_max*delta_frac
+
 # %%
 # Create the MCMC sampler
 # --------------------------------------------------------------
@@ -232,25 +263,54 @@ prior.denoiser.load_state_dict(ckpt["state_dict"])
 # ``regularization`` controls the strength of the prior and
 # ``iterations`` controls the number of iterations of the sampler.
 
-regularization = 10
-step_size = 1e-4
-iterations = int(100) if torch.cuda.is_available() else 10
+regularization = 4
+step_size = 5e-5
+#step_size = delta_max * 20
+# step_size = 1.0351e-08
+iterations = int(2000) if torch.cuda.is_available() else 10
 params = {
     "step_size": step_size,
     "alpha": regularization,
     "sigma": 1*(25/255.0),
     "eta"  : 0.05,
-    "inner_iter": 10
+    "inner_iter": 10,
+    "method" : "SKROCK",
 }
+
+#%% init wandb
+project = "sampling_ct"
+use_wandb = True
+if use_wandb:
+    wandb.init(entity='bloom', project=project, config=params, save_code=True)
+else:
+    wandb.init(mode="disabled")
+# #%% log measurement
+wandb.log({"Observation" : wandb.Image((y/torch.max(y)).cpu().squeeze(), caption="Observation")})
+# log ground truth
+wandb.log({"Ground truth" : wandb.Image((x).cpu().squeeze(), caption="Ground truth")})
+
+
+#%% define the callback for wandb logging
+def call(X, statistics, iter, **kwargs):
+    psnr_log = dinv.metric.PSNR()(x, statistics[0].mean().clamp(0,1)).item()
+    print(f"PSNR: {psnr_log:.2f} dB")
+    wandb.log({"PSNR" : psnr_log,
+               "Variance" : wandb.Image(statistics[0].var().sqrt().cpu().squeeze(),
+                                        caption="Variance"),
+               "Posterior mean" : wandb.Image(statistics[0].mean().cpu().squeeze(),
+                                        caption="Mean")},
+               step=iter+1)
+
 f = dinv.sampling.sampling_builder(
-    "SKROCK",
+    params['method'],
     prior=prior,
     data_fidelity=data_fidelity,
     max_iter=iterations,
     params_algo=params,
-    thinning=1,
+    thinning=10,
     verbose=True,
-    clip=[0,1]
+    clip=[0,1],
+    callback=call,
 )
 
 #% run the sampler
@@ -271,11 +331,17 @@ plot(
     imgs,
     titles=["Input", "GT", "FBP", "recon"],
     save_dir=RESULTS_DIR,
-    rescale_mode="min_max"
+    rescale_mode="min_max",
+    #rescale_mode="clip"
 )
 
-plot(torch.sqrt(var), save_dir=RESULTS_DIR / "std")
+plot(torch.sqrt(var).clamp(None, 0.33), save_dir=RESULTS_DIR / "std")
 
+#%% 
+#plot(torch.sqrt(var).clamp(None, 0.1207), rescale_mode="min_max")
+import matplotlib.pyplot as plt
+plt.imshow(torch.sqrt(var).clamp(None, 0.1207).cpu().squeeze(), vmax=0.1207, cmap='gray')
+plt.colorbar()
 
 
 #%%

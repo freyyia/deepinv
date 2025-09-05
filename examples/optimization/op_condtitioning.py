@@ -39,6 +39,25 @@ def compute_largest_eigenvalue_ATA(A, im_size, max_iter=100, tol=1e-6, device="c
 
     return lambda_new.item()
 
+def normal_mv(x):  # N(x) = A^T A x
+    return physics.A_adjoint(physics.A(x))
+
+@torch.no_grad()
+def lipschitz_estimate(x0, iters=25, probes=8):
+
+    # Power iteration on N
+    x = torch.randn_like(x0)
+    x /= x.norm()
+    lam = None
+    for _ in range(iters):
+        y = normal_mv(x)
+        ny = y.norm()
+        if ny == 0: break
+        x = y / ny
+        lam = (x * normal_mv(x)).sum().item()
+    return lam  # lam ≈ λ_max(N)
+
+
 
 #%%
 def compute_smallest_eigenvalue_ATA(physics, im_size, max_iter=100, tol=1e-6, device="cpu"):
@@ -50,15 +69,13 @@ def compute_smallest_eigenvalue_ATA(physics, im_size, max_iter=100, tol=1e-6, de
     vec = torch.randn(im_size, device=device)
     vec /= torch.linalg.norm(vec)
     
-    # 1. Define the matvec function for the LinearOperator.
-    # This is the same function as before, but we'll call it `matvec` for clarity.
+    # Define the matvec function for the LinearOperator.
     def AtA_matvec(x_vec: np.ndarray) -> np.ndarray:
         x_tensor = torch.from_numpy(x_vec).reshape(im_size).to(device).float()
         with torch.no_grad():
             y_tensor = physics.A_adjoint(physics.A(x_tensor))
         return y_tensor.cpu().numpy().flatten()
 
-    # 2. THE FIX: Create a SciPy LinearOperator object.
     # This provides SciPy's CG solver with the necessary metadata (shape, dtype).
     num_pixels = np.prod(im_size)
     operator_shape = (num_pixels, num_pixels)
@@ -99,30 +116,32 @@ def compute_smallest_eigenvalue_ATA(physics, im_size, max_iter=100, tol=1e-6, de
 
 # Set up  physics model
 device = dinv.utils.get_freer_gpu() if torch.cuda.is_available() else "cpu"
-im_size = (1, 1, 128, 128)
-# angles = 360
+im_size = (1, 1, 256, 256)
+angles = 360
 #limited view angles
-angles = torch.linspace(20, 160, steps=140).to(device)
-#noise_model = dinv.physics.PoissonNoise(torch.tensor(1.0/20))
+#angles = torch.linspace(20, 160, steps=140).to(device)
+noise_model = dinv.physics.PoissonNoise(torch.tensor(1.0/20))
 physics = dinv.physics.Tomography(img_width=im_size[-1], 
                                   angles=angles, 
-                                  #noise_model=noise_model,
+                                  noise_model=noise_model,
                                   device=device)
+
+lam_est = lipschitz_estimate(torch.randn(im_size, device=device))
+print(f"The largest eigenvalue of A^T*A is (meth 1): {lam_est:.4f}")
 
 # Call the function with physics
 largest_eig = compute_largest_eigenvalue_ATA(physics, im_size, device=device)
 
 print(f"\nUsing custom power iteration function:")
 print(f"The largest eigenvalue of A^T*A is: {largest_eig:.4f}")
-print(f"The Lipschitz constant of A is: {largest_eig**0.5:.4f}")
 
-print(f"Compare with approximate operator norm of A^T A: { torch.pi / (2 * angles)}")
-print(f"And approximate Lip constant of A: {1/(torch.pi / (2 * angles))}")  
+# print(f"Compare with approximate operator norm of A^T A: { torch.pi / (2 * angles)}")
+ 
 
 # Call the function to compute smalles EV
-s_eig = compute_smallest_eigenvalue_ATA(physics, im_size, device=device)
+# s_eig = compute_smallest_eigenvalue_ATA(physics, im_size, device=device)
 
-print(f"\nThe smallest non-zero eigenvalue of A^T*A is: {s_eig:.4e}")
-print(f"The strong-convexity constant m of A is: {s_eig**0.5:.4f}")
+# print(f"\nThe smallest non-zero eigenvalue of A^T*A is: {s_eig:.4e}")
+# print(f"The strong-convexity constant m of A is: {s_eig**0.5:.4f}")
 
 # %%
