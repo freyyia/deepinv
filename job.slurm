@@ -34,4 +34,25 @@ echo "I was allocated the following GPU devices: $CUDA_VISIBLE_DEVICES"
 # cd examples/patch-priors
 # python demo_patch_priors_CT.py
 cd examples/optimization
-python training_lidcldrislicedataset.py
+#python low_dose_ct_experiment.py --prior_type 2 --im_idx 1 --method "MLA" --poisson_level 10 --regularization 4 --step_size 1e-4 --iterations 10000 --inset_loc "(0.52,0.55)"
+#python low_dose_ct_experiment.py --prior_type 0 --im_idx 1 --method "MLA" --poisson_level 10 --regularization 4 --step_size 1e-4 --iterations 10000 --inset_loc "(0.52,0.55)"
+#python low_dose_ct_experiment.py --prior_type 1 --im_idx 1 --method "MLA" --poisson_level 10 --regularization 4 --step_size 1e-4 --iterations 10000 --inset_loc "(0.52,0.55)"
+#python low_dose_ct_experiment.py --prior_type 2 --im_idx 1 --method "SKROCK" --poisson_level 10 --regularization 4 --step_size 5e-5 --iterations 5000 --inset_loc "(0.52,0.55)"
+#python low_dose_ct_experiment.py --prior_type 0 --im_idx 1 --method "SKROCK" --poisson_level 10 --regularization 4 --step_size 5e-5 --iterations 5000 --inset_loc "(0.52,0.55)"
+#python low_dose_ct_experiment.py --prior_type 1 --im_idx 1 --method "SKROCK" --poisson_level 10 --regularization 4 --step_size 5e-5 --iterations 5000 --inset_loc "(0.52,0.55)"
+# python low_dose_ct_experiment.py --prior_type 2 --im_idx 3 --method "MLA" --poisson_level 10 --regularization 4 --step_size 1e-4 --iterations 10000 --inset_loc "(0.42,0.56)"
+# python low_dose_ct_experiment.py --prior_type 0 --im_idx 2 --method "MLA" --poisson_level 10 --regularization 4 --step_size 1e-4 --iterations 10000 --inset_loc "(0.42,0.56)"
+# python low_dose_ct_experiment.py --prior_type 1 --im_idx 2 --method "MLA" --poisson_level 10 --regularization 4 --step_size 1e-4 --iterations 10000 --inset_loc "(0.42,0.56)"
+# python low_dose_ct_experiment.py --prior_type 2 --im_idx 2 --method "SKROCK" --poisson_level 10 --regularization 4 --step_size 5e-5 --iterations 5000 --inset_loc "(0.42,0.56)"
+# python low_dose_ct_experiment.py --prior_type 0 --im_idx 2 --method "SKROCK" --poisson_level 10 --regularization 4 --step_size 5e-5 --iterations 5000 --inset_loc "(0.42,0.56)"
+# python low_dose_ct_experiment.py --prior_type 1 --im_idx 2 --method "SKROCK" --poisson_level 10 --regularization 4 --step_size 5e-5 --iterations 5000 --inset_loc "(0.42,0.56)"
+# python low_dose_ct_experiment.py --prior_type 2 --im_idx 0 --method "MLA" --poisson_level 10 --regularization 4 --step_size 1e-4 --iterations 10000 --inset_loc "(0.45,0.5)"
+# python low_dose_ct_experiment.py --prior_type 0 --im_idx 0 --method "MLA" --poisson_level 10 --regularization 4 --step_size 1e-4 --iterations 10000 --inset_loc "(0.45,0.5)"
+# python low_dose_ct_experiment.py --prior_type 1 --im_idx 0 --method "MLA" --poisson_level 10 --regularization 4 --step_size 1e-4 --iterations 10000 --inset_loc "(0.45,0.5)"
+# python low_dose_ct_experiment.py --prior_type 2 --im_idx 0 --method "SKROCK" --poisson_level 10 --regularization 4 --step_size 5e-5 --iterations 3000 --inset_loc "(0.45,0.5)"
+# python low_dose_ct_experiment.py --prior_type 0 --im_idx 0 --method "SKROCK" --poisson_level 10 --regularization 4 --step_size 5e-5 --iterations 3000 --inset_loc "(0.45,0.5)"
+# python low_dose_ct_experiment.py --prior_type 1 --im_idx 0 --method "SKROCK" --poisson_level 10 --regularization 4 --step_size 5e-5 --iterations 3000 --inset_loc "(0.45,0.5)"
+
+
+python low_dose_ct_experiment.py --prior_type 0 --im_idx 1 --method "MLA" --poisson_level 10 --regularization 4 --step_size 1e-4 --iterations 10000 --inset_loc "(0.52,0.55)"
+python low_dose_ct_experiment.py --prior_type 0 --im_idx 1 --method "SKROCK" --poisson_level 10 --regularization 4 --step_size 5e-5 --iterations 5000 --inset_loc "(0.52,0.55)"

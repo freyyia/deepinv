@@ -95,7 +95,7 @@ img_size = 256
 
 #%% lidc test data set
 problem = "Tomography"
-save_dir = f'../datasets/{problem}'
+save_dir = f'datasets/{problem}'
 
 data_test = [dinv.datasets.HDF5Dataset(path=f'{save_dir}/dinv_dataset0.h5', train=False)]
 
@@ -201,6 +201,16 @@ def custom_output(X):
 #         ),
 #     )
 
+#collection of paths 
+#"datasets/ct_drunet/epoch=69-step=43680.ckpt"
+# "datasets/ct_drunet/epoch=77-step=48672.ckpt"
+#"datasets/ct_drunet/epoch=113-step=71136.ckpt"
+net_path = "../../../bregman_sampling/Prox_GSPnP/GS_denoising/ckpts/test/epoch=808-step=504816.ckpt"
+#net_path = "../../../bregman_sampling/Prox_GSPnP/GS_denoising/ckpts/test_reg/epoch=8-step=5616.ckpt"
+#net_path = "../../../bregman_sampling/Prox_GSPnP/GS_denoising/ckpts/test_reg/epoch=9-step=6240.ckpt"
+#net_path = "../../../bregman_sampling/Prox_GSPnP/GS_denoising/ckpts/test_reg_old/epoch=15-step=9984.ckpt"
+
+
 #soon to be proxdrunet
 model_gsdrunet = dinv.models.GSDRUNet(
     in_channels=1,
@@ -210,7 +220,8 @@ model_gsdrunet = dinv.models.GSDRUNet(
     pretrained=Path(
         #"datasets/ct_drunet/epoch=69-step=43680.ckpt"
         # "datasets/ct_drunet/epoch=77-step=48672.ckpt"
-        "datasets/ct_drunet/epoch=113-step=71136.ckpt"
+        #"datasets/ct_drunet/epoch=113-step=71136.ckpt"
+        net_path
     ),
 )
 
@@ -223,8 +234,8 @@ prior = dinv.optim.ScorePrior(
 
 ).to(device)
 
-trained_path = "./datasets/Tomographysup_ct_denoising/ckp_best.pth.tar"
-ckpt = torch.load(trained_path, map_location=device)
+net_path = "datasets/Tomographysup_ct_denoising/25-08-27-15:53:54/ckp_best.pth.tar"
+ckpt = torch.load(net_path, map_location=device)
 prior.denoiser.load_state_dict(ckpt["state_dict"])
 
 

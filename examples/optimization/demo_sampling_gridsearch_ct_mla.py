@@ -95,7 +95,7 @@ img_size = 256
 
 #%% lidc test data set
 problem = "Tomography"
-save_dir = f'../datasets/{problem}'
+save_dir = f'datasets/{problem}'
 
 data_test = [dinv.datasets.HDF5Dataset(path=f'{save_dir}/dinv_dataset0.h5', train=False)]
 iterator = iter(data_test[0])
@@ -189,7 +189,7 @@ def custom_output(X):
 # prior = GSPnP(denoiser=dinv.models.GSDRUNet(act_mode='s', 
 #                                            pretrained=filepath).to(device))
 
-# pretrained = "../datasets/Tomographysup/25-08-25-15_19_57/ckp_best.pth.tar" 
+# net_path = "../datasets/Tomographysup/25-08-25-15_19_57/ckp_best.pth.tar" 
 
 #Artifact removal doesn't work here
 # denoiser = dinv.models.ArtifactRemoval(
@@ -207,37 +207,48 @@ def custom_output(X):
 #         ),
 #     )
 
+#collection of paths 
+#"datasets/ct_drunet/epoch=69-step=43680.ckpt"
+# "datasets/ct_drunet/epoch=77-step=48672.ckpt"
+#"datasets/ct_drunet/epoch=113-step=71136.ckpt"
+#net_path = "../../../bregman_sampling/Prox_GSPnP/GS_denoising/ckpts/test/epoch=808-step=504816.ckpt"
+#net_path = "../../../bregman_sampling/Prox_GSPnP/GS_denoising/ckpts/test_reg/epoch=8-step=5616.ckpt"
+#net_path = "../../../bregman_sampling/Prox_GSPnP/GS_denoising/ckpts/test_reg/epoch=9-step=6240.ckpt"
+#net_path = "../../../bregman_sampling/Prox_GSPnP/GS_denoising/ckpts/test_reg/epoch=16-step=10608.ckpt"
+#net_path = "../../../bregman_sampling/Prox_GSPnP/GS_denoising/ckpts/test_reg_old/epoch=15-step=9984.ckpt"
+
 #soon to be proxdrunet
-model_gsdrunet = dinv.models.GSDRUNet(
-    in_channels=1,
-    out_channels=1,
-    act_mode='s',
-    device=device,
-    pretrained=Path(
-        #"datasets/ct_drunet/epoch=69-step=43680.ckpt"
-        # "datasets/ct_drunet/epoch=77-step=48672.ckpt"
-        #"datasets/ct_drunet/epoch=113-step=71136.ckpt"
-        "datasets/ct_drunet/epoch=808-step=504816.ckpt"
-    ),
-)
+# model_gsdrunet = dinv.models.GSDRUNet(
+#     in_channels=1,
+#     out_channels=1,
+#     act_mode='s',
+#     device=device,
+#     pretrained=Path(
+#         #"datasets/ct_drunet/epoch=69-step=43680.ckpt"
+#         # "datasets/ct_drunet/epoch=77-step=48672.ckpt"
+#         #"datasets/ct_drunet/epoch=113-step=71136.ckpt"
+#         # "../../../bregman_sampling/Prox_GSPnP/GS_denoising/ckpts/test/epoch=808-step=504816.ckpt"
+#         net_path
+#     ),
+# )
 
-# prior = dinv.optim.ScorePrior(
-#     denoiser=dinv.models.UNet(in_channels=1, 
-#                               out_channels=1, 
-#                               scales=4, 
-#                               bias=False, 
-#                               batch_norm=False)
+prior = dinv.optim.ScorePrior(
+    denoiser=dinv.models.UNet(in_channels=1, 
+                              out_channels=1, 
+                              scales=4, 
+                              bias=False, 
+                              batch_norm=False)
 
-# ).to(device)
+).to(device)
 
-# trained_path = "./datasets/Tomographysup_ct_denoising/ckp_best.pth.tar"
-# ckpt = torch.load(trained_path, map_location=device)
-# prior.denoiser.load_state_dict(ckpt["state_dict"])
+net_path = "datasets/Tomographysup_ct_denoising/25-08-27-15:53:54/ckp_best.pth.tar"
+ckpt = torch.load(net_path, map_location=device)
+prior.denoiser.load_state_dict(ckpt["state_dict"])
 
 
 
-prior = GSPnP(denoiser=model_gsdrunet.to(device))
-prior = dinv.optim.ScorePrior(denoiser=model_gsdrunet.to(device)).to(device)
+# prior = GSPnP(denoiser=model_gsdrunet.to(device))
+# prior = dinv.optim.ScorePrior(denoiser=model_gsdrunet.to(device)).to(device)
 
 # ram_model = dinv.models.RAM(device=device, pretrained=True)
 # t =ram_model(y, physics)
@@ -271,7 +282,7 @@ delta = delta_max*delta_frac
 # ``iterations`` controls the number of iterations of the sampler.
 
 regularization = 4
-step_size = 5e-5
+step_size = 1e-4
 #step_size = delta_max * 20
 # step_size = 1.0351e-08
 iterations = int(5000) if torch.cuda.is_available() else 10
@@ -282,6 +293,7 @@ params = {
     "eta"  : 0.05,
     "inner_iter": 10,
     "method" : "MLA",
+    "network": net_path,
 }
 
 #%% init wandb
