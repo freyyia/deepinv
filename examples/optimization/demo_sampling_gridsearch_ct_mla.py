@@ -103,7 +103,7 @@ iterator = iter(data_test[0])
 #40
 #3
 
-for i in range(40):
+for i in range(1):
     (x, _) = next(iterator)
 
 x = x.unsqueeze(0).to(device)
@@ -236,7 +236,7 @@ model_gsdrunet = dinv.models.GSDRUNet(
 
 
 
-prior = GSPnP(denoiser=model_gsdrunet.to(device))
+# prior = GSPnP(denoiser=model_gsdrunet.to(device))
 prior = dinv.optim.ScorePrior(denoiser=model_gsdrunet.to(device)).to(device)
 
 # ram_model = dinv.models.RAM(device=device, pretrained=True)
@@ -278,7 +278,7 @@ iterations = int(5000) if torch.cuda.is_available() else 10
 params = {
     "step_size": step_size,
     "alpha": regularization,
-    "sigma": 1*(25/255.0),
+    "sigma": 1*(20/255.0),
     "eta"  : 0.05,
     "inner_iter": 10,
     "method" : "MLA",
