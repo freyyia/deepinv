@@ -103,7 +103,7 @@ iterator = iter(data_test[0])
 #40
 #3
 
-for i in range(40):
+for i in range(1):
     (x, _) = next(iterator)
 
 x = x.unsqueeze(0).to(device)
@@ -218,19 +218,18 @@ def custom_output(X):
 #net_path = "../../../bregman_sampling/Prox_GSPnP/GS_denoising/ckpts/test_reg_old/epoch=15-step=9984.ckpt"
 
 #soon to be proxdrunet
-# model_gsdrunet = dinv.models.GSDRUNet(
-#     in_channels=1,
-#     out_channels=1,
-#     act_mode='s',
-#     device=device,
-#     pretrained=Path(
-#         #"datasets/ct_drunet/epoch=69-step=43680.ckpt"
-#         # "datasets/ct_drunet/epoch=77-step=48672.ckpt"
-#         #"datasets/ct_drunet/epoch=113-step=71136.ckpt"
-#         # "../../../bregman_sampling/Prox_GSPnP/GS_denoising/ckpts/test/epoch=808-step=504816.ckpt"
-#         net_path
-#     ),
-# )
+model_gsdrunet = dinv.models.GSDRUNet(
+    in_channels=1,
+    out_channels=1,
+    act_mode='s',
+    device=device,
+    pretrained=Path(
+        #"datasets/ct_drunet/epoch=69-step=43680.ckpt"
+        # "datasets/ct_drunet/epoch=77-step=48672.ckpt"
+        #"datasets/ct_drunet/epoch=113-step=71136.ckpt"
+        "datasets/ct_drunet/epoch=808-step=504816.ckpt"
+    ),
+)
 
 prior = dinv.optim.ScorePrior(
     denoiser=dinv.models.UNet(in_channels=1, 
@@ -248,7 +247,7 @@ prior.denoiser.load_state_dict(ckpt["state_dict"])
 
 
 # prior = GSPnP(denoiser=model_gsdrunet.to(device))
-# prior = dinv.optim.ScorePrior(denoiser=model_gsdrunet.to(device)).to(device)
+prior = dinv.optim.ScorePrior(denoiser=model_gsdrunet.to(device)).to(device)
 
 # ram_model = dinv.models.RAM(device=device, pretrained=True)
 # t =ram_model(y, physics)
@@ -289,7 +288,7 @@ iterations = int(5000) if torch.cuda.is_available() else 10
 params = {
     "step_size": step_size,
     "alpha": regularization,
-    "sigma": 1*(25/255.0),
+    "sigma": 1*(20/255.0),
     "eta"  : 0.05,
     "inner_iter": 10,
     "method" : "MLA",
