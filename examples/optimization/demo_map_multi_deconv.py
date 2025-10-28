@@ -87,6 +87,9 @@ for i in range(len(kernels_list)):
 
 # create stacked physics operator
 physics = dinv.physics.StackedLinearPhysics(physics_list, device=device)
+# test with one kernel
+#physics = physics_list[0]
+
 
 # create a list of likelihoods, one for each physics operator
 like_list = []
@@ -95,7 +98,8 @@ for i in range(len(physics_list)):
     like_list.append(like_i)
 
 data_fidelity = dinv.optim.StackedPhysicsDataFidelity(like_list)
-
+#test with one kernel aka likelihood
+#data_fidelity = like_list[0]
 
 # Select the first image from the dataset
 # x = dataset[2][0].unsqueeze(0).to(device) #grayscale
@@ -112,6 +116,8 @@ avg_y= [sum(y_i)/len(y) for y_i in zip(*y)]
 ## see how that looks like
 dinv.utils.plot([x, avg_y[0]], titles=["gt", "mean y"])
 
+#plot if using only one kernel
+#dinv.utils.plot([x, y], titles=["gt", "mean y"])
 
 
 #%% Setup the second reconstruction method
@@ -148,11 +154,11 @@ filepath = hf_hub_download(
 )
 # hf_path = "https://huggingface.co/deepinv/gradientstep/resolve/main/Prox-DRUNet.ckpt"
 # Specify the Denoising prior
-# prior = GSPnP(denoiser=dinv.models.GSDRUNet(act_mode='s', 
-#                                            pretrained=filepath).to(device))
+prior = GSPnP(denoiser=dinv.models.GSDRUNet(act_mode='s', 
+                                            pretrained=filepath).to(device))
 
 # Specify the TV prior
-prior = dinv.optim.prior.TVPrior(n_it_max=20)
+#prior = dinv.optim.prior.TVPrior(n_it_max=20)
 
 
 #%%
@@ -168,9 +174,11 @@ prior = dinv.optim.prior.TVPrior(n_it_max=20)
 def custom_output(X):
     return X["est"][1]
 
-max_iter = 8
+max_iter = 200
 multiple_list = [1]
-lamb_list = [1e-2]#[0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15]
+# 1e-2 ... TV
+# 5e-1 ... good for PRoxDrunet
+lamb_list = [5e-1]#[0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12, 0.13, 0.14, 0.15]
 stepsize_list = [1] 
 
 for i in range(len(lamb_list)):
@@ -178,6 +186,7 @@ for i in range(len(lamb_list)):
         lamb = lamb_list[i] 
         stepsize = 1
         sigma_denoiser = multiple_list[j] * (25/255.0)  
+        print(f"Running with {prior.__class__.__name__} prior")
         print(f"=== Running for lamb = {lamb} and sigma_denoiser factor = { multiple_list[j]} ===")
 
         params_algo = {
@@ -191,7 +200,7 @@ for i in range(len(lamb_list)):
         model = optim_builder(
             iteration="PGD",
             prior=prior,
-            g_first=True,
+            g_first=False,
             data_fidelity=data_fidelity,
             params_algo=params_algo,
             early_stop=False,
@@ -201,37 +210,42 @@ for i in range(len(lamb_list)):
             backtracking=True,
             get_output=custom_output,
             verbose=False,
+            custom_init=lambda observation, physics: {
+            "est": (physics.A_adjoint(observation)/len(like_list), physics.A_adjoint(observation)/len(like_list))
+                },  # initialize the optimization with scaled adjoint
         )
 
         #run the model on the problem.
         with torch.no_grad():
-            x_model_proxdrunet, metrics_proxdrunet = model(
+            x_model, metrics = model(
                 y, physics, x_gt=x, compute_metrics=True
             )  # reconstruction with PGD algorithm
-        print(f"Prox-DRUNet reconstruction PSNR: {dinv.metric.PSNR()(x, x_model_proxdrunet.clamp(0,1)).item():.2f} dB")
+        print(f"Reconstruction PSNR: {dinv.metric.PSNR()(x, x_model.clamp(0,1)).item():.2f} dB")
 
-        print(f"Prox-DRUNet reconstruction lpips: {dinv.metric.LPIPS(device=device)(x, x_model_proxdrunet.clamp(0,1)).item():.3f}")
+        print(f"Reconstruction lpips: {dinv.metric.LPIPS(device=device)(x, x_model.clamp(0,1)).item():.3f}")
 
 
         # plot images. Images are saved in RESULTS_DIR.
-        imgs = [y[0], x,  x_model_proxdrunet/8]
+        # imgs = [avg_y[0], x,  x_model]
+        imgs = [y[0], x,  x_model]
+
         plot(
             imgs,
-            titles=["Input", "GT", "Proxdrunet"],
+            titles=["Input", "GT", "Recon"],
             save_dir=RESULTS_DIR,
             rescale_mode="clip"
         )
 
         # plot convergence curves
         if plot_convergence_metrics:
-            plot_curves(metrics_proxdrunet)
+            plot_curves(metrics)
 
 
 
 # %% plot inset
     
 dinv.utils.plot_inset( imgs,
-    titles=["Observation", "GT", "Prox-DRUNet"],
+    titles=["Observation", "GT", "Recon"],
     extract_loc=(0.47, 0.45),
     inset_loc=(0.0, 0.6),
     save_fn = RESULTS_DIR / "inset.png",
@@ -252,10 +266,10 @@ dinv.utils.plot_inset( [x],
     save_fn = RESULTS_DIR / "gt_inset.png",
     )
 
-dinv.utils.plot_inset( [x_model_proxdrunet],
+dinv.utils.plot_inset( [x_model],
     titles=[""],
     extract_loc=(0.47, 0.45),
     inset_loc=(0.0, 0.6),
-    save_fn = RESULTS_DIR / "proxdrunet_inset.png",
+    save_fn = RESULTS_DIR / "recon_inset.png",
     )
 # %%
