@@ -36,3 +36,7 @@ from .ncsnpp import NCSNpp
 from .guided_diffusion import ADMUNet
 from .precond import EDMPrecond
 from .ram import RAM
+from .client import Client
+from .wrapper import DiffusersDenoiserWrapper, ComplexDenoiserWrapper
+from .poisson2sparse import ConvLista, Poisson2Sparse
+from .kernel_network import KernelIdentificationNetwork

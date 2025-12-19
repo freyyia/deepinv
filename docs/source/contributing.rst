@@ -13,6 +13,28 @@ View our active list of contributors `here <https://github.com/deepinv/deepinv/g
 Learn more about our code philosophy in the paper:
 `DeepInverse: A Python package for solving imaging inverse problems with deep learning <https://arxiv.org/abs/2505.20160>`_.
 
+Finding Issues to Work On
+-------------------------
+
+We welcome contributions in all areas!
+Get started by looking for
+`good first issue <https://github.com/deepinv/deepinv/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22>`_ or
+`open to contribs <https://github.com/deepinv/deepinv/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22open%20to%20contribs%22>`_.
+Or, to help you find something interesting or relevant to your
+expertise, have a search in our `issues <https://github.com/deepinv/deepinv/issues>`_. Here are some keywords you could search for:
+
+.. list-table::
+   :widths: 25 25 25 25
+
+   * - `optimization <https://github.com/deepinv/deepinv/issues?q=is%3Aissue+state%3Aopen+optim>`_ 
+     - `training <https://github.com/deepinv/deepinv/issues?q=is%3Aissue+state%3Aopen+trainer>`_ 
+     - `datasets <https://github.com/deepinv/deepinv/issues?q=is%3Aissue+state%3Aopen+dataset>`_ 
+     - `losses <https://github.com/deepinv/deepinv/issues?q=is%3Aissue+state%3Aopen+loss>`_ 
+   * - `diffusion <https://github.com/deepinv/deepinv/issues?q=is%3Aissue+state%3Aopen+diffusion>`_ 
+     - `mri <https://github.com/deepinv/deepinv/issues?q=is%3Aissue+state%3Aopen+mri>`_ 
+     - `tomography <https://github.com/deepinv/deepinv/issues?q=is%3Aissue+state%3Aopen+tomography>`_ 
+     - `docs <https://github.com/deepinv/deepinv/issues?q=is%3Aissue+state%3Aopen+docs>`_ 
+
 
 How to Contribute
 -----------------
@@ -39,8 +61,8 @@ repository <https://github.com/deepinv/deepinv/>`_ on GitHub,
 then submit a "Pull Request" (PR). When preparing the PR, please make sure to
 check the following points:
 
-- **Code quality**: your code is compliant with PEP8, the `black <https://black.readthedocs.io>`_ style and a partial `ruff <https://docs.astral.sh/ruff/>`_ checker. This can be done easily
-  by installing the ``black`` and ``ruff`` libraries and running ``black .`` and ``ruff check --fix`` in the root directory of the repository after
+- **Code quality**: your code is compliant with PEP8, the `black <https://black.readthedocs.io>`_ style and `ruff <https://docs.astral.sh/ruff/>`_ checkers. This can be done easily
+  by installing the ``black`` and ``ruff`` libraries and running ``black .`` and ``ruff check`` in the root directory of the repository after
   making the desired changes.
 - **Typing**: your docstrings and code are adequately typed. Typing rules such as PEP585 are automatically checked using ruff.
 - **Tests**: write tests in ``deepinv/tests`` to test your code's intended functionality,
@@ -99,7 +121,7 @@ See the `Sphinx documentation <https://www.sphinx-doc.org/en/master/usage/restru
 
 Please follow these guidelines:
 
-- Each parameter and return must be properly descreibed, along with a type annotations for each ``:param`` field, as shown below:
+- Each parameter and return must be properly described, along with a type annotations for each ``:param`` field, as shown below:
 
   .. code-block:: rest
 
@@ -166,3 +188,12 @@ In order to contribute a new dataset, you must provide tests alongisde it to che
 We get around this by mocking datasets in the tests. First, write the tests and the implementation, and make sure that the tests pass locally, on the real data. Then, write `mocking code <https://en.wikipedia.org/wiki/Mock_object>`_, code that intercepts calls to input/output (IO) related functions, e.g. `os.listdir`, and make them return a hard coded value, thereby making execution go as if the data was there. For more details and examples, see `this pull request <https://github.com/deepinv/deepinv/pull/490>`_.
 
 Once the implementation, the tests and the mocking code are written, that they pass locally and on the CI servers, the maintainers will be able to review the code and merge it into the main branch if everything goes well. You should bear in mind though that the maintainers won't have the time to make sure the tests pass on the real data, so they will have to trust that you did things correctly.
+
+
+Maintainers commands
+--------------------
+
+Maintainers can use the following slash commands as comments on a pull request to trigger specific tests:
+
+- `/test-examples`: runs **all** sphinx gallery examples on CPU using CPU-enabled runners.
+- `/gpu-tests`: runs tests and generates docs on GPU using GPU-enabled runners.

@@ -7,6 +7,8 @@ from deepinv.models import Reconstructor
 import deepinv.physics
 from deepinv.sampling import BaseSampling
 from deepinv.sampling.sampling_iterators import DiffusionIterator
+from deepinv.utils.compat import zip_strict
+from deepinv.optim.data_fidelity import L2
 
 
 class DiffusionSampler(BaseSampling):
@@ -67,7 +69,7 @@ class DiffusionSampler(BaseSampling):
         :param torch.Tensor y: Measurements
         :param deepinv.physics.Physics physics: Forward operator associated with the measurements
         :param float seed: Random seed for generating the samples
-        :return: (tuple of torch.tensor) containing the posterior mean and variance.
+        :return: (tuple of torch.Tensor) containing the posterior mean and variance.
         """
         return self.sample(y, physics, seed=seed, g_statistics=self.g_statistics)
 
@@ -76,7 +78,7 @@ class DDRM(Reconstructor):
     r"""
     Denoising Diffusion Restoration Models (DDRM).
 
-    This class implements the Denoising Diffusion Restoration Model (DDRM) described in :footcite:t:`zhu2023denoising`.
+    This class implements the Denoising Diffusion Restoration Model (DDRM) described in :footcite:t:`kawar2022denoising`.
 
     The DDRM is a sampling method that uses a denoiser to sample from the posterior distribution of the inverse problem.
 
@@ -85,7 +87,7 @@ class DDRM(Reconstructor):
 
     :param torch.nn.Module denoiser: a denoiser model that can handle different noise levels.
     :param list[int] sigmas: a list of noise levels to use in the diffusion, they should be in decreasing
-        order from 1 to 0.
+        order from 1 to 0. Defaults to ``np.linspace(1, 0, 100)``, i.e., 100 equally spaced noise levels from 1 to 0.
     :param float eta: hyperparameter
     :param float etab: hyperparameter
     :param bool verbose: if True, print progress
@@ -120,12 +122,14 @@ class DDRM(Reconstructor):
     def __init__(
         self,
         denoiser,
-        sigmas=np.linspace(1, 0, 100),
+        sigmas=None,
         eta=0.85,
         etab=1.0,
         verbose=False,
         eps=1e-6,
     ):
+        if sigmas is None:
+            sigmas = np.linspace(1, 0, 100)
         super(DDRM, self).__init__()
         self.denoiser = denoiser
         self.sigmas = sigmas
@@ -175,7 +179,7 @@ class DDRM(Reconstructor):
             mean[case] = y_bar[case]
             std[case] = (self.sigmas[0] ** 2 - nsr[case].pow(2)).sqrt()
             x_bar = mean + std * torch.randn_like(y_bar) / np.sqrt(2.0)
-            x_bar_prev = x_bar.clone()
+            x_bar_prev = x_bar
 
             # denoise
             x = self.denoiser(physics.V(x_bar), self.sigmas[0])
@@ -206,7 +210,7 @@ class DDRM(Reconstructor):
                 )
 
                 x_bar = mean + std * torch.randn_like(x_bar) / np.sqrt(2.0)
-                x_bar_prev = x_bar.clone()
+                x_bar_prev = x_bar
                 # denoise
                 x = self.denoiser(physics.V(x_bar), self.sigmas[t])
 
@@ -554,7 +558,7 @@ class DPS(Reconstructor):
             \end{equation*}
 
     :param torch.nn.Module model: a denoiser network that can handle different noise levels
-    :param deepinv.optim.DataFidelity data_fidelity: the data fidelity operator
+    :param deepinv.optim.DataFidelity data_fidelity: the data fidelity operator, if kept to `None`, defaults to :class:`deepinv.optim.L2` (the choice in the paper).
     :param int max_iter: the number of diffusion iterations to run the algorithm (default: 1000)
     :param float eta: DDIM hyperparameter which controls the stochasticity
     :param bool verbose: if True, print progress
@@ -565,7 +569,7 @@ class DPS(Reconstructor):
     def __init__(
         self,
         model,
-        data_fidelity,
+        data_fidelity=None,
         max_iter=1000,
         eta=1.0,
         verbose=False,
@@ -575,6 +579,8 @@ class DPS(Reconstructor):
         super(DPS, self).__init__()
         self.model = model
         self.model.requires_grad_(True)
+        if data_fidelity is None:
+            data_fidelity = L2()
         self.data_fidelity = data_fidelity
         self.max_iter = max_iter
         self.eta = eta
@@ -609,6 +615,15 @@ class DPS(Reconstructor):
         return a
 
     def forward(self, y, physics: deepinv.physics.Physics, seed=None, x_init=None):
+        r"""
+        Computes a random sample from the posterior distribution using the DPS algorithm.
+
+        :param torch.Tensor y: the measurements.
+        :param deepinv.physics.Physics physics: the physics operator.
+        :param int seed: the seed for the random number generator.
+        :param torch.Tensor x_init: the initial guess for the reconstruction, if not provided
+            the algorithm initializes with random noise in image space.
+        """
         if seed:
             torch.manual_seed(seed)
 
@@ -617,10 +632,15 @@ class DPS(Reconstructor):
 
         seq = range(0, self.num_train_timesteps, skip)
         seq_next = [-1] + list(seq[:-1])
-        time_pairs = list(zip(reversed(seq), reversed(seq_next), strict=True))
+        time_pairs = list(zip_strict(reversed(seq), reversed(seq_next)))
 
         # Initial sample from x_T
-        x = torch.randn_like(y) if x_init is None else (2 * x_init - 1)
+        if x_init is not None:
+            x = 2 * x_init - 1
+        elif isinstance(physics, deepinv.physics.LinearPhysics):
+            x = torch.randn_like(physics.A_adjoint(y))
+        else:
+            x = torch.randn_like(physics.A_dagger(y))
 
         if self.save_iterates:
             xs = [x]
@@ -668,7 +688,7 @@ class DPS(Reconstructor):
 
             if self.save_iterates:
                 xs.append(xt_next.to("cpu"))
-            xt = xt_next.clone()
+            xt = xt_next
 
         if self.save_iterates:
             return xs

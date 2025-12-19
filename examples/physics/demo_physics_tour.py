@@ -4,7 +4,7 @@ Tour of forward sensing operators
 
 This example provides a tour of some of the forward operators implemented in DeepInverse.
 We restrict ourselves to operators where the signal is a 2D image. The full list of operators can be found in
-`here <physics>`_.
+:ref:`here <physics>`.
 
 """
 
@@ -12,7 +12,7 @@ import torch
 
 import deepinv as dinv
 from deepinv.utils.plotting import plot
-from deepinv.utils.demo import load_example
+from deepinv.utils import load_example
 
 
 # %%
@@ -248,7 +248,9 @@ plot([x, y], titles=["signal", "measurement"])
 # The downsampling class :class:`deepinv.physics.Downsampling` is associated with a downsampling operator.
 
 
-physics = dinv.physics.Downsampling(img_size=img_size, factor=2, device=device)
+physics = dinv.physics.Downsampling(
+    img_size=img_size, factor=2, device=device, filter="bicubic"
+)
 
 
 y = physics(x)

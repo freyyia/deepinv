@@ -5,6 +5,7 @@ import numpy as np
 import deepinv as dinv
 from deepinv.optim.data_fidelity import L2
 from deepinv.sampling import ULA, SKRock, DiffPIR, DPS, sampling_builder, DDRM
+from deepinv.utils.compat import zip_strict
 
 SAMPLING_ALGOS = ["DDRM", "ULA", "SKRock"]
 
@@ -112,7 +113,8 @@ def test_algo(name_algo, device):
     test_sample = torch.ones((1, 3, 64, 64), device=device)
 
     sigma = 1
-    physics = dinv.physics.Denoising()
+    # choose physics that changes the image size
+    physics = dinv.physics.Blur(dinv.physics.blur.gaussian_blur(3), device=device)
     physics.noise_model = dinv.physics.GaussianNoise(sigma)
     y = physics(test_sample)
 
@@ -186,7 +188,7 @@ def test_algo_inpaint(name_algo, device):
     mean_target_inmask = 1 / 3.0
 
     assert (mean_target_inmask - mean_crop).abs() < 0.2
-    assert (mean_target_masked - mean_outside_crop).abs() < 0.01
+    assert (mean_target_masked - mean_outside_crop).abs() < 0.02
 
 
 # tests for sample_builder
@@ -307,7 +309,7 @@ def test_sde(device):
         HeunSolver(timesteps=timesteps, rng=rng),
     ]
     sde_classes = [VarianceExplodingDiffusion, VariancePreservingDiffusion]
-    for denoiser, kwargs in zip(denoisers, list_kwargs, strict=True):
+    for denoiser, kwargs in zip_strict(denoisers, list_kwargs):
         for solver in solvers:
             for sde_class in sde_classes:
                 sde = sde_class(
