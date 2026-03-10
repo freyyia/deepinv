@@ -6,6 +6,7 @@ from deepinv.optim.potential import Potential
 from deepinv.models.tv import TVDenoiser
 from deepinv.models.wavdict import WaveletDenoiser, WaveletDictDenoiser
 from deepinv.utils import patch_extractor
+from deepinv.models.utils import load_state_dict_from_url
 
 
 class Prior(Potential):
@@ -37,41 +38,39 @@ class Prior(Potential):
         self.explicit_prior = False if self._fn is None else True
 
 
-class Zero(Prior):
+class ZeroPrior(Prior):
     r"""
     Zero prior :math:`\reg{x} = 0`.
     """
 
     def __init__(self):
         super().__init__()
-
-        def forward(x, *args, **kwargs):
-            return torch.tensor(0.0)
-
-        self._g = forward
         self.explicit_prior = True
 
     def fn(self, x, *args, **kwargs):
         r"""
-        Computes the zero prior :math:`\reg(x) = 0` at :math:`x`.
+        Computes the zero prior :math:`\reg{x} = 0` at :math:`x`.
 
-        It returns a tensor of zeros of the same shape as :math:`x`.
+        :param torch.Tensor x: Variable :math:`x` at which the prior is computed.
+        :return: (:class:`torch.Tensor`) prior :math:`\reg{x}`.
         """
-        return torch.zeros_like(x)
+        return torch.zeros(x.shape[0], device=x.device)
 
     def grad(self, x, *args, **kwargs):
         r"""
-        Computes the gradient of the zero prior :math:`\reg(x) = 0` at :math:`x`.
+        Computes the gradient of the zero prior :math:`\reg{x} = 0` at :math:`x`.
 
-        It returns a tensor of zeros of the same shape as :math:`x`.
+        :param torch.Tensor x: Variable :math:`x` at which the prior is computed.
+        :return: (:class:`torch.Tensor`) gradient at :math:`x`.
         """
         return torch.zeros_like(x)
 
     def prox(self, x, ths=1.0, gamma=1.0, *args, **kwargs):
         r"""
-        Computes the proximal operator of the zero prior :math:`\reg(x) = 0` at :math:`x`.
+        Computes the proximal operator of the zero prior :math:`\reg{x} = 0` at :math:`x`.
 
-        It returns the identity :math:`x`.
+        :param torch.Tensor x: Variable :math:`x` at which the prior is computed.
+        :return: (:class:`torch.Tensor`) proximity operator at :math:`x`.
         """
         return x
 
@@ -631,7 +630,7 @@ class PatchNR(Prior):
                     url = "https://drive.google.com/uc?export=download&id=1Z2us9ZHjDGOlU6r1Jee0s2BBej2XV5-i"
                 else:
                     raise ValueError("Pretrained weights not found!")
-                weights = torch.hub.load_state_dict_from_url(
+                weights = load_state_dict_from_url(
                     url, map_location=lambda storage, loc: storage, file_name=file_name
                 )
             self.normalizing_flow.load_state_dict(weights)
