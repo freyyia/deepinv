@@ -3,11 +3,11 @@ import torch.nn
 import numpy as np
 
 import deepinv as dinv
-from deepinv.optim.data_fidelity import L2
-from deepinv.sampling import ULA, SKRock, DiffPIR, DPS, sampling_builder, DDRM
+from deepinv.optim.data_fidelity import L2, PoissonLikelihood
+from deepinv.sampling import ULA, SKRock, MLA, DiffPIR, DPS, sampling_builder, DDRM
 from deepinv.utils.compat import zip_strict
 
-SAMPLING_ALGOS = ["DDRM", "ULA", "SKRock"]
+SAMPLING_ALGOS = ["DDRM", "ULA", "SKRock", "MLA"]
 
 
 def choose_algo(algo, likelihood, thresh_conv, sigma, sigma_prior):
@@ -33,6 +33,17 @@ def choose_algo(algo, likelihood, thresh_conv, sigma, sigma_prior):
             clip=(-100, 100),
             thresh_conv=thresh_conv,
             sigma=1,
+            verbose=True,
+        )
+    elif algo == "MLA":
+        out = MLA(
+            GaussianScore(sigma_prior),
+            PoissonLikelihood(gain=1.0),
+            max_iter=200,
+            thinning=1,
+            step_size=1e-3,
+            thresh_conv=thresh_conv,
+            sigma=sigma,
             verbose=True,
         )
     elif algo == "DDRM":
@@ -68,15 +79,33 @@ class GaussianDenoiser(torch.nn.Module):
 
 @pytest.mark.parametrize("algo", SAMPLING_ALGOS)
 def test_sampling_algo(algo, imsize, device):
-    test_sample = torch.ones((1, *imsize))
-
     sigma = 1
     sigma_prior = 1
+    convergence_crit = 0.1  # for fast tests
+
+    if algo == "MLA":
+        # MLA requires positive-valued inputs (Burg entropy)
+        test_sample = torch.ones((1, *imsize)) * 0.5
+        physics = dinv.physics.Denoising()
+        physics.noise_model = dinv.physics.PoissonNoise(gain=1.0)
+        y = physics(test_sample).clamp(1e-6, None)
+        f = choose_algo(
+            algo,
+            None,
+            thresh_conv=convergence_crit,
+            sigma=sigma,
+            sigma_prior=sigma_prior,
+        )
+        xmean, xvar = f(y, physics, seed=0, x_init=y.clone())
+        assert xmean.shape == test_sample.shape
+        assert (xmean > 0).all()
+        return
+
+    test_sample = torch.ones((1, *imsize))
     physics = dinv.physics.Denoising()
     physics.noise_model = dinv.physics.GaussianNoise(sigma)
     y = physics(test_sample)
 
-    convergence_crit = 0.1  # for fast tests
     likelihood = L2(sigma=sigma)
     f = choose_algo(
         algo,
@@ -192,7 +221,7 @@ def test_algo_inpaint(name_algo, device):
 
 
 # tests for sample_builder
-BUILD_ALGOS = ["ULA", "SKRock"]
+BUILD_ALGOS = ["ULA", "SKRock", "MLA"]
 
 
 def choose_algo_build(algo, likelihood, thresh_conv, sigma, sigma_prior):
@@ -212,6 +241,13 @@ def choose_algo_build(algo, likelihood, thresh_conv, sigma, sigma_prior):
             "eta": 0.05,
             "sigma": 1.0,
         }
+    elif algo == "MLA":
+        params = {
+            "step_size": 1e-3,
+            "alpha": 1.0,
+            "sigma": sigma,
+        }
+        likelihood = PoissonLikelihood(gain=1.0)
     else:
         raise Exception("The sampling algorithm doesn't exist")
 
@@ -234,15 +270,32 @@ def choose_algo_build(algo, likelihood, thresh_conv, sigma, sigma_prior):
 @pytest.mark.parametrize("algo", BUILD_ALGOS)
 def test_build_algo(algo, imsize, device):
     # NOTE: redundancy here with the above test_sample_algo
-    test_sample = torch.ones((1, *imsize))
-
     sigma = 1
     sigma_prior = 1
+    convergence_crit = 0.1  # for fast tests
+
+    if algo == "MLA":
+        test_sample = torch.ones((1, *imsize)) * 0.5
+        physics = dinv.physics.Denoising()
+        physics.noise_model = dinv.physics.PoissonNoise(gain=1.0)
+        y = physics(test_sample).clamp(1e-6, None)
+        f = choose_algo_build(
+            algo,
+            None,
+            thresh_conv=convergence_crit,
+            sigma=sigma,
+            sigma_prior=sigma_prior,
+        )
+        xmean, xvar = f.sample(y, physics, seed=0, x_init=y.clone())
+        assert xmean.shape == test_sample.shape
+        assert (xmean > 0).all()
+        return
+
+    test_sample = torch.ones((1, *imsize))
     physics = dinv.physics.Denoising()
     physics.noise_model = dinv.physics.GaussianNoise(sigma)
     y = physics(test_sample)
 
-    convergence_crit = 0.1  # for fast tests
     likelihood = L2(sigma=sigma)
     f = choose_algo_build(
         algo,
@@ -429,3 +482,5 @@ def test_noisy_data_fidelity(device):
             assert output.shape == x.shape
         except NotImplementedError:
             pass
+
+
