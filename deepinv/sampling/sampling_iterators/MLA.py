@@ -38,7 +38,7 @@ class MLAIterator(SamplingIterator):
          - Noise level for the score prior denoiser. A larger value results in a more regularized reconstruction
     """
 
-    def __init__(self, algo_params: dict[str, float], **kwargs):
+    def __init__(self, algo_params: dict[str, float], clip: tuple[float, float] | None = None, **kwargs):
         super().__init__(algo_params)
 
         missing_params = []
@@ -55,6 +55,9 @@ class MLAIterator(SamplingIterator):
             )
 
         self.potential = BurgEntropy()
+        # Only the upper bound is needed: the Burg mirror map keeps iterates strictly
+        # positive automatically, so only clip(x, None, upper) is applied.
+        self.clip_upper = clip[1] if clip is not None else None
 
     def forward(
         self,
@@ -89,4 +92,6 @@ class MLAIterator(SamplingIterator):
         )
         yk2 = yk1 + self.algo_params["step_size"] * (lhood + lprior) + noise
         xk = self.potential.grad_conj(yk2).clamp(1e-6, None)
+        if self.clip_upper is not None:
+            xk = xk.clamp(None, self.clip_upper)
         return {"x": xk}
