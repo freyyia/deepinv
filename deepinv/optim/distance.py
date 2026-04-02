@@ -241,7 +241,7 @@ class PoissonLikelihoodDistance(Distance):
         """
         if self.denormalize:
             y = y / self.gain
-        return self.gain * (1 - y / (x / self.gain + self.bkg))
+        return (1 / self.gain) * (1 - y / (x / self.gain + self.bkg))
 
     def prox(
         self, x: torch.Tensor, y: torch.Tensor, *args, gamma: float = 1.0, **kwargs
