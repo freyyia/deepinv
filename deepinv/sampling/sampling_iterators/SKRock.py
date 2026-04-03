@@ -14,6 +14,17 @@ T_s = lambda s, u: np.cosh(s * np.arccosh(u))
 T_prime_s = lambda s, u: s * np.sinh(s * np.arccosh(u)) / np.sqrt(u**2 - 1)
 
 
+def _reflbox(x: torch.Tensor, lower: float, upper: float) -> torch.Tensor:
+    """Reflect x into [lower, upper] at both boundaries.
+
+    first reflects at ``lower`` (via abs), then reflects at ``upper``.
+    """
+    x = lower + torch.abs(x - lower)  # reflect at lower
+    excess = (x - upper).clamp(min=0)
+    x = x - 2 * excess  # reflect at upper
+    return x
+
+
 class SKRockIterator(SamplingIterator):
     r"""
     Single iteration of the SK-ROCK (Stabilized Runge-Kutta-Chebyshev) Algorithm.
@@ -27,7 +38,9 @@ class SKRockIterator(SamplingIterator):
     - For convergence, SKROCK requires that ``step_size`` smaller than :math:`\frac{1}{L+\|A\|_2^2}`
 
     :param tuple(int,int) clip: Tuple of (min, max) values to clip/project the samples into a bounded range during sampling.
-        Useful for images where pixel values should stay within a specific range (e.g., (0,1) or (0,255)). Default: ``None``
+        Useful for images where pixel values should stay within a specific range (e.g., (0,1) or (0,255)).
+        When set, reflection boundary conditions (``reflbox``) are applied at each internal Chebyshev stage
+        rather than clipping at the end. Default: ``None``
     :param dict algo_params: Dictionary containing the algorithm parameters (see table below)
 
     .. list-table::
@@ -39,13 +52,16 @@ class SKRockIterator(SamplingIterator):
          - Description
        * - step_size
          - float
-         - Step size of the algorithm (default: 1.0). Tip: use physics.lipschitz to compute the Lipschitz constant
+         - Base step size :math:`\delta` of the algorithm. The effective internal step is
+           :math:`\delta_{\mathrm{SKROCK}} = \rho \cdot \delta` where :math:`\rho` is the
+           SK-ROCK stiffness ratio determined by ``inner_iter`` and ``eta``.
+           Tip: use physics.lipschitz to compute the Lipschitz constant
        * - alpha
          - float
          - Regularization parameter :math:`\alpha` (default: 1.0)
        * - inner_iter
          - int
-         - Number of internal iterations (default: 10)
+         - Number of internal Chebyshev stages :math:`s` (default: 10)
        * - eta
          - float
          - Damping parameter :math:`\eta` (default: 0.05)
@@ -106,43 +122,48 @@ class SKRockIterator(SamplingIterator):
             "alpha"
         ] * (cur_prior.grad(u, self.algo_params["sigma"]))
 
-        # Compute SK-ROCK parameters
-        w0 = 1 + self.algo_params["eta"] / (
-            self.algo_params["inner_iter"] ** 2
-        )  # parameter \omega_0
-        w1 = T_s(self.algo_params["inner_iter"], w0) / T_prime_s(
-            self.algo_params["inner_iter"], w0
-        )  # parameter \omega_1
-        mu1 = w1 / w0  # parameter \mu_1
-        nu1 = self.algo_params["inner_iter"] * w1 / 2  # parameter \nu_1
-        kappa1 = self.algo_params["inner_iter"] * (w1 / w0)  # parameter \kappa_1
+        # Boundary operator: reflbox at each stage if clip is set, identity otherwise
+        if self.clip:
+            boundary = lambda u: _reflbox(u, self.clip[0], self.clip[1])
+        else:
+            boundary = lambda u: u
 
-        # Sample noise
-        noise = torch.randn_like(x) * np.sqrt(2 * self.algo_params["step_size"])
+        # SK-ROCK stiffness ratio rho and effective internal step dtSKROCK = rho * delta
+        n_stages = self.algo_params["inner_iter"]
+        eta = self.algo_params["eta"]
+        rhoSKROCK = (n_stages - 0.5) ** 2 * (2 - (4 / 3) * eta) - 1.5
+        dtSKROCK = rhoSKROCK * self.algo_params["step_size"]
+
+        # Compute SK-ROCK Chebyshev parameters
+        w0 = 1 + eta / (n_stages ** 2)  # parameter \omega_0
+        w1 = T_s(n_stages, w0) / T_prime_s(n_stages, w0)  # parameter \omega_1
+        mu1 = w1 / w0  # parameter \mu_1
+        nu1 = n_stages * w1 / 2  # parameter \nu_1
+        kappa1 = n_stages * (w1 / w0)  # parameter \kappa_1
+
+        # Sample noise scaled by dtSKROCK
+        noise = torch.randn_like(x) * np.sqrt(2 * dtSKROCK)
 
         # First internal iteration (s=1)
         xts_2 = x.clone()
-        xts = (
+        xts = boundary(
             x.clone()
-            - mu1 * self.algo_params["step_size"] * posterior(x + nu1 * noise)
+            - mu1 * dtSKROCK * posterior(boundary(x + nu1 * noise))
             + kappa1 * noise
         )
 
         # Remaining internal iterations
-        for js in range(2, self.algo_params["inner_iter"] + 1):
+        for js in range(2, n_stages + 1):
             xts_1 = xts.clone()
             mu = 2 * w1 * T_s(js - 1, w0) / T_s(js, w0)  # parameter \mu_js
             nu = 2 * w0 * T_s(js - 1, w0) / T_s(js, w0)  # parameter \nu_js
             kappa = 1 - nu  # parameter \kappa_js
-            xts = (
-                -mu * self.algo_params["step_size"] * posterior(xts)
+            xts = boundary(
+                -mu * dtSKROCK * posterior(xts)
                 + nu * xts
                 + kappa * xts_2
             )
             xts_2 = xts_1
-
-        if self.clip:
-            xts = projbox(xts, self.clip[0], self.clip[1])
 
         return {"x": xts}
 
