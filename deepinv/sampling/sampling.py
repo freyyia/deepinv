@@ -230,7 +230,7 @@ class BaseSampling(Reconstructor):
             # Initialize Welford trackers for each g_statistic
             statistics = []
             for g in g_statistics:
-                statistics.append(Welford(g(X)))
+                statistics.append(Welford(g(X), track_quantiles=True, alpha_ci=0.05))
 
             # Initialize for convergence checking
             mean_prevs = [stat.mean().clone() for stat in statistics]
