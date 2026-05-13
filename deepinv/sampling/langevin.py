@@ -8,7 +8,7 @@ import deepinv.optim
 from deepinv.sampling import BaseSampling
 from deepinv.optim import ScorePrior
 from deepinv.physics import Physics
-from deepinv.sampling.sampling_iterators import ULAIterator, SKRockIterator, MLAIterator
+from deepinv.sampling.sampling_iterators import ULAIterator, SKRockIterator, MLAIterator, MLA3DIterator
 
 
 class ULA(BaseSampling):
@@ -273,6 +273,104 @@ class MLA(BaseSampling):
     ):
         algo_params = {"step_size": step_size, "alpha": alpha, "sigma": sigma}
         iterator = MLAIterator(algo_params)
+        super().__init__(
+            iterator,
+            data_fidelity,
+            prior,
+            max_iter=max_iter,
+            thresh_conv=thresh_conv,
+            burnin_ratio=burnin_ratio,
+            thinning=thinning,
+            history_size=save_chain,
+            verbose=verbose,
+        )
+
+    def forward(
+        self,
+        y: Tensor,
+        physics: Physics,
+        seed: None | int = None,
+        x_init: None | Tensor = None,
+        g_statistics: list[Callable] | Callable = lambda d: d["x"],
+    ):
+        r"""
+        Runs the chain to obtain the posterior mean and variance of the reconstruction of the measurements y.
+
+        :param torch.Tensor y: Measurements (must be strictly positive)
+        :param deepinv.physics.Physics physics: Forward operator associated with the measurements
+        :param float seed: Random seed for generating the Monte Carlo samples
+        :param torch.Tensor x_init: Initial point for the chain (must be strictly positive). Defaults to ``y``.
+        :param list[Callable] | Callable g_statistics: List of functions for which to compute posterior statistics, or a single function.
+            The sampler will compute the posterior mean and variance of each function in the list. Note the sampler outputs a dictionary so they must act on `d["x"]`.
+            Default: ``lambda d: d["x"]`` (identity function)
+        :return: (tuple of torch.Tensor) containing the posterior mean and variance.
+        """
+        warn(
+            "Deprecated MLA.forward returns tuple (mean, var). This will return only mean in a future version in line with BaseSampling.forward. Use deepinv.sampling.sampling_builder instead to build an MLA sampler",
+            DeprecationWarning,
+        )
+        return self.sample(
+            y, physics, x_init=x_init, seed=seed, g_statistics=g_statistics
+        )
+
+
+class MLA3D(BaseSampling):
+    r"""
+    Mirror Langevin Algorithm for Bayesian inverse problems with positive-valued images.
+
+    Uses the Burg entropy as a mirror map to ensure iterates remain positive, making it
+    suitable for problems with Poisson noise or other non-negative image domains.
+
+    The algorithm runs the following mirror Langevin iteration:
+
+    .. math::
+
+        y_{k+1} = \nabla \phi(x_k) + \eta \left( \nabla \log p(y|A,x_k) +
+        \alpha \nabla \log p(x_k) \right) + \sqrt{2\eta H(x_k)} z_{k+1}
+
+    .. math::
+
+        x_{k+1} = \nabla \phi^*(y_{k+1})
+
+    where :math:`\phi` is the Burg entropy :math:`\phi(x) = -\sum_i \log x_i`,
+    :math:`\phi^*` is its convex conjugate, :math:`H(x_k)` is the diagonal Hessian of
+    :math:`\phi` at :math:`x_k`, and :math:`z \sim \mathcal{N}(0,I)`.
+
+    .. warning::
+        This a legacy class provided for convenience. MLA requires strictly positive inputs;
+        ensure your measurements and initialisation satisfy :math:`x > 0`.
+
+    :param deepinv.optim.ScorePrior, torch.nn.Module prior: negative log-prior based on a trained or model-based denoiser.
+    :param deepinv.optim.DataFidelity, torch.nn.Module data_fidelity: negative log-likelihood function linked with the
+        noise distribution in the acquisition physics. Recommended: :class:`deepinv.optim.PoissonLikelihood`.
+    :param float step_size: step size :math:`\eta>0` of the algorithm.
+    :param float sigma: noise level used in the plug-and-play prior denoiser.
+    :param float alpha: regularization parameter :math:`\alpha`.
+    :param int max_iter: number of Monte Carlo iterations.
+    :param int thinning: Thins the Markov Chain by an integer :math:`\geq 1` (i.e., keeping one out of ``thinning``
+        samples to compute posterior statistics).
+    :param float burnin_ratio: percentage of iterations used for burn-in period, should be set between 0 and 1.
+    :param float thresh_conv: Threshold for verifying the convergence of the mean and variance estimates.
+    :param bool save_chain: if ``True``, saves the full chain history.
+    :param bool verbose: prints progress of the algorithm.
+    """
+
+    def __init__(
+        self,
+        prior,
+        data_fidelity,
+        step_size: float = 1e-3,
+        sigma: float = 0.05,
+        alpha: float = 1.0,
+        max_iter: int = 1e3,
+        thinning: int = 5,
+        burnin_ratio: float = 0.2,
+        thresh_conv: float = 1e-3,
+        save_chain: bool = False,
+        verbose: bool = False,
+    ):
+        algo_params = {"step_size": step_size, "alpha": alpha, "sigma": sigma}
+        iterator = MLA3DIterator(algo_params)
         super().__init__(
             iterator,
             data_fidelity,
